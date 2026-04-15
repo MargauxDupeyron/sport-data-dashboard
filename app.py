@@ -1,3 +1,4 @@
+import re
 import streamlit as st
 import pandas as pd
 import numpy as np
@@ -289,29 +290,43 @@ with tab_analyse:
     st.caption("Sélectionnez une discipline et une ville pour explorer les équipements et la concurrence.")
 
     # ── Filters ───────────────────────────────────────────────────────────────
-    categories = ["Toutes les catégories"] + sorted(_CATEGORY_KEYWORDS.keys())
-    selected_category = st.selectbox("🏆 Catégorie", categories, key="selected_category")
+    selected_categories = st.multiselect(
+        "🏆 Catégorie", sorted(_CATEGORY_KEYWORDS.keys()),
+        placeholder="Toutes les catégories"
+    )
 
     col_f1, col_f2 = st.columns(2)
 
     with col_f1:
-        sports_in_cat = get_sports_in_category(df, selected_category)
-        default_disc = sports_in_cat.index("Danse") if "Danse" in sports_in_cat else 0
-        selected_discipline = st.selectbox("🏃 Discipline", sports_in_cat, index=default_disc)
+        if selected_categories:
+            sports_set = set()
+            for cat in selected_categories:
+                sports_set.update(get_sports_in_category(df, cat))
+            sports_in_cat = sorted(sports_set)
+        else:
+            sports_in_cat = get_sports_list(df)
 
-    # Filter by discipline first to get relevant cities
-    disc_df = df[df["aps_name"].fillna("").str.contains(selected_discipline, case=False)]
+        selected_disciplines = st.multiselect(
+            "🏃 Discipline", sports_in_cat,
+            placeholder="Toutes les disciplines"
+        )
+
+    # Filter by disciplines to get relevant cities
+    if selected_disciplines:
+        pattern = "|".join(re.escape(d) for d in selected_disciplines)
+        disc_df = df[df["aps_name"].fillna("").str.contains(pattern, case=False)]
+    else:
+        disc_df = df[df["aps_name"].fillna("").str.len() > 0]
 
     with col_f2:
         cities = sorted(disc_df["new_name"].dropna().unique())
-        # Try to preserve the previously selected city across discipline changes
         saved_city = st.session_state.get("selected_city")
         default_index = cities.index(saved_city) if saved_city in cities else 0
         selected_city = st.selectbox("🏙️ Commune", cities if cities else ["Aucune commune trouvée"], index=default_index)
         st.session_state["selected_city"] = selected_city
 
     if not cities:
-        st.warning("Aucune commune trouvée pour cette discipline.")
+        st.warning("Aucune commune trouvée pour cette sélection.")
         st.stop()
 
     # Radius filter
@@ -327,7 +342,8 @@ with tab_analyse:
     col_map2, col_detail = st.columns([3, 2])
 
     with col_map2:
-        st.subheader(f"📍 {selected_discipline} à {selected_city}")
+        disc_label = ", ".join(selected_disciplines) if selected_disciplines else "Toutes disciplines"
+        st.subheader(f"📍 {disc_label} à {selected_city}")
 
         if city_disc_df.empty:
             st.info("Aucun équipement géolocalisé pour cette sélection.")
@@ -407,10 +423,12 @@ with tab_analyse:
             sel_equip_id = selected_row.get("equip_numero", None)
 
             # All same-discipline facilities with coordinates (excluding itself)
-            comp_pool = df[
-                df["aps_name"].fillna("").str.contains(selected_discipline, case=False) &
-                df["lat"].notna() & df["lon"].notna()
-            ].copy()
+            if selected_disciplines:
+                comp_pattern = "|".join(re.escape(d) for d in selected_disciplines)
+                comp_mask = df["aps_name"].fillna("").str.contains(comp_pattern, case=False)
+            else:
+                comp_mask = df["aps_name"].fillna("").str.len() > 0
+            comp_pool = df[comp_mask & df["lat"].notna() & df["lon"].notna()].copy()
             comp_pool = comp_pool[comp_pool["equip_numero"] != sel_equip_id]
 
             # Distance to each competitor
