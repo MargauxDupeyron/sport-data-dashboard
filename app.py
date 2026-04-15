@@ -37,6 +37,71 @@ def get_sports_list(df):
         df["aps_name"].dropna().str.split(",").explode().str.strip().unique()
     )
 
+# Category → lowercase keywords for matching sport names
+_CATEGORY_KEYWORDS = {
+    "Athlétisme & Courses": [
+        "course sur le plat", "course sur piste", "course et marche",
+        "marathon", "marche nordique", "marche ", "lancer", " saut",
+        "épreuves combin", "cross country", "duathlon", "triathlon", "pentathlon",
+    ],
+    "Cyclisme": ["cycl", "bicross", "bmx", "vtt"],
+    "Danse & Expression": [
+        "danse", "ballet", "expression gymnique", "expression libre",
+        "twirling", "cheerleading", "swing",
+    ],
+    "Équitation": [
+        "équitation", "dressage", "saut d'obstacle", "concours complet",
+        "horse-ball", "polo-v", "équestre", "attelage", "rodéo",
+    ],
+    "Escalade & Montagne": ["escalade", "alpinisme", "via ferrata", "spéléo", "canyonisme"],
+    "Glisse sur neige & glace": [
+        "ski ", "snowboard", "surf des neiges", "luge", "bobsleigh",
+        "curling", "patinage", "ballet sur glace", "ringuette",
+    ],
+    "Glisse urbaine": ["roller", "skate", "planche à roulettes"],
+    "Gymnastique": ["gymn", "trampoline", "tumbling", "double mini", "acrobatique"],
+    "Musculation & Force": ["haltéro", "muscul", "culturisme", "force athlét"],
+    "Natation & Sports aquatiques": [
+        "natation", "water-polo", "plongeon", "synchronis",
+        "nage", "aquagym", "baignade", "plong",
+    ],
+    "Plein air & Randonnée": ["randonn", "raquette à neige", "cross canin", "orientation"],
+    "Sports aériens": [
+        "parachut", "parapente", "deltaplane", "vol à voile", "voltige",
+        "aéro", "planeur", "giraviation", "cerf volant", "ascensionnel", "aérostat",
+    ],
+    "Sports collectifs": [
+        "basket", "handball", "volley", "football", "rugby",
+        "hockey", "baseball", "softball", "cricket", "beach soccer", "futsal",
+    ],
+    "Sports de combat": [
+        "boxe", "karaté", "taekwondo", "kick boxing", "muay", "savate",
+        "full contact", "judo", "jujitsu", "lutte", "sambo", "sumo",
+        "escrime", "kendo", "aïkido", "aikido", "arts martiaux", "bâton", "canne",
+    ],
+    "Sports de raquette": ["tennis", "badminton", "squash", "padel", "racquetball", "pickleball"],
+    "Sports de tir": ["tir ", "arbalète", "carabine", "pistolet", "cible", "plateaux", "fosse", "compak"],
+    "Sports mécaniques": ["karting", "motocross", "motocycl", "moto ", "automobile", "enduro", "quad", "motonautisme"],
+    "Sports nautiques": [
+        "aviron", "canoë", "kayak", "voile", "surf", "planche à voile",
+        "ski nautique", "pirogue", "stand up", "wave-ski", "raft",
+        "joutes", "sauvetage c", "merathon",
+    ],
+    "Activités de forme & bien-être": ["activités de forme", "multisports", "tai chi", "chi gong"],
+    "Jeux & Divers": [
+        "billard", "boules", "bowling", "pétanque", "jeu de",
+        "échecs", "crocket", "paintball", "pêche", "longue paume", "courte paume",
+    ],
+}
+
+@st.cache_data
+def get_sports_in_category(df, category):
+    all_sports = sorted(df["aps_name"].dropna().str.split(",").explode().str.strip().unique())
+    if category == "Toutes les catégories":
+        return all_sports
+    keywords = _CATEGORY_KEYWORDS.get(category, [])
+    return [s for s in all_sports if any(kw in s.lower() for kw in keywords)] or all_sports
+
 def haversine_km(lat1, lon1, lat2, lon2):
     """Vectorised haversine — returns distance in km."""
     R = 6371.0
@@ -224,11 +289,15 @@ with tab_analyse:
     st.caption("Sélectionnez une discipline et une ville pour explorer les équipements et la concurrence.")
 
     # ── Filters ───────────────────────────────────────────────────────────────
+    categories = ["Toutes les catégories"] + sorted(_CATEGORY_KEYWORDS.keys())
+    selected_category = st.selectbox("🏆 Catégorie", categories, key="selected_category")
+
     col_f1, col_f2 = st.columns(2)
 
     with col_f1:
-        sports_sorted = get_sports_list(df)
-        selected_discipline = st.selectbox("🏃 Discipline", sports_sorted, index=sports_sorted.index("Danse") if "Danse" in sports_sorted else 0)
+        sports_in_cat = get_sports_in_category(df, selected_category)
+        default_disc = sports_in_cat.index("Danse") if "Danse" in sports_in_cat else 0
+        selected_discipline = st.selectbox("🏃 Discipline", sports_in_cat, index=default_disc)
 
     # Filter by discipline first to get relevant cities
     disc_df = df[df["aps_name"].fillna("").str.contains(selected_discipline, case=False)]
