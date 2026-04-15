@@ -19,8 +19,7 @@ DATA_URL = (
 
 @st.cache_data(ttl=86400)  # cache for 24h — data is updated daily
 def load_data():
-    with st.spinner("Chargement des données depuis data.gouv.fr…"):
-        df = pd.read_csv(DATA_URL, sep=";", low_memory=False)
+    df = pd.read_csv(DATA_URL, sep=";", low_memory=False)
     # Parse coordinates
     coords = df["equip_coordonnees"].dropna().str.split(",", expand=True)
     coords.columns = ["lat", "lon"]
@@ -47,7 +46,8 @@ def haversine_km(lat1, lon1, lat2, lon2):
     a = np.sin(dlat / 2) ** 2 + np.cos(lat1) * np.cos(lat2) * np.sin(dlon / 2) ** 2
     return R * 2 * np.arcsin(np.sqrt(a))
 
-df = load_data()
+with st.spinner("Chargement des données depuis data.gouv.fr…"):
+    df = load_data()
 
 # ── Tabs ───────────────────────────────────────────────────────────────────────
 tab_dashboard, tab_analyse = st.tabs(["📊 Tableau de bord", "🔍 Analyse par discipline & lieu"])
