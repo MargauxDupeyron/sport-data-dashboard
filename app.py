@@ -235,7 +235,11 @@ with tab_analyse:
 
     with col_f2:
         cities = sorted(disc_df["new_name"].dropna().unique())
-        selected_city = st.selectbox("🏙️ Commune", cities if cities else ["Aucune commune trouvée"])
+        # Try to preserve the previously selected city across discipline changes
+        saved_city = st.session_state.get("selected_city")
+        default_index = cities.index(saved_city) if saved_city in cities else 0
+        selected_city = st.selectbox("🏙️ Commune", cities if cities else ["Aucune commune trouvée"], index=default_index)
+        st.session_state["selected_city"] = selected_city
 
     if not cities:
         st.warning("Aucune commune trouvée pour cette discipline.")
