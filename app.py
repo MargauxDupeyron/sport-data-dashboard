@@ -18,9 +18,19 @@ DATA_URL = (
     "catalog/datasets/data-es/exports/csv?delimiter=%3B"
 )
 
+# Only load columns the app actually uses — reduces memory by ~80%
+_USECOLS = [
+    "equip_coordonnees", "equip_numero", "equip_nom",
+    "equip_type_famille", "equip_type_name", "equip_nature", "equip_sol",
+    "equip_eclair", "equip_ouv_public_bool", "equip_acc_libre",
+    "inst_numero", "inst_nom", "inst_adresse", "inst_cp", "inst_acc_handi_bool",
+    "aps_name", "new_name", "dep_nom", "reg_nom",
+]
+
 @st.cache_data(ttl=86400)  # cache for 24h — data is updated daily
 def load_data():
-    df = pd.read_csv(DATA_URL, sep=";", low_memory=False)
+    df = pd.read_csv(DATA_URL, sep=";", low_memory=False,
+                     usecols=lambda c: c in _USECOLS)
     # Parse coordinates
     coords = df["equip_coordonnees"].dropna().str.split(",", expand=True)
     coords.columns = ["lat", "lon"]
